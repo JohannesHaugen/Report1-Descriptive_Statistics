@@ -1,0 +1,172 @@
+---
+title: "Descriptive statistics"
+author: "Johannes Urdahl Haugen"
+date: "10/8/2020"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+## Part 1: Reproduce a table
+```{r Libraries, echo=FALSE, message=FALSE, warning=FALSE}
+library(readxl)
+library(readr)
+library(knitr)
+library(kableExtra)
+library(tidyverse)
+library(flextable)
+```
+
+```{r load-data, echo=FALSE, message=FALSE, warning=FALSE}
+download.file(url = "https://ndownloader.figstatic.com/files/14702420", 
+              destfile = "./data/hypertrophy.csv")  # Laster ned datafilen.
+
+hypertrophy <- read_csv("./data/hypertrophy.csv")  # Laster inn datafilen og kobler den til objektet hypertrophy.
+
+var_interest <- c("SUB_ID", "GROUP", "CLUSTER", "AGE", "T1_BODY_MASS", "PERCENT_TYPE_II_T1", 
+                  "Squat_3RM_kg", "DXA_LBM_1", "DXA_FM_T1", "SQUAT_VOLUME")
+
+hyp1 <- hypertrophy %>%
+  select(all_of(var_interest))
+
+
+```
+
+```{r Tabell 1, echo=FALSE, message=FALSE, warning=FALSE}
+hyp1 %>%
+  filter(!is.na(CLUSTER)) %>%
+
+  select(-GROUP) %>%
+  
+  pivot_longer(names_to = "variable", 
+               values_to = "value", 
+               cols = AGE:SQUAT_VOLUME) %>%
+  
+  group_by(CLUSTER, variable) %>%
+  summarise(m = mean(value), 
+            s = sd(value)) %>% 
+  mutate(ms = paste(round(m, 1), " (", round(s, 1), ")", sep = ""),
+         
+         CLUSTER = factor(CLUSTER, levels = c("LOW", "HIGH"), 
+                          labels = c("LOW (n = 10)", 
+                                     "HIGH (n = 10)")),
+         
+         variable = factor(variable, 
+                           levels = c("AGE", 
+                                      "T1_BODY_MASS", 
+                                      "DXA_LBM_1", 
+                                      "DXA_FM_T1", 
+                                      "PERCENT_TYPE_II_T1", 
+                                      "Squat_3RM_kg", 
+                                      "SQUAT_VOLUME"), 
+                           labels = c("Age (years)", 
+                                      "Body mass (kg)", 
+                                      "DXA LST (kg)", 
+                                      "DXA FM (kg)", 
+                                      "Type II Fiber (%)", 
+                                      "3RM back squat (kg)", 
+                                      "Total training volume (kg) from weeks 1 to 6"))) %>%
+ select(-m, -s) %>%
+
+  pivot_wider(names_from = CLUSTER, 
+              values_from = ms) %>%
+  arrange(variable) %>%
+  select(variable, `LOW (n = 10)`, `HIGH (n = 10)`) %>%
+  
+  flextable() %>%
+  
+  add_header_row(values = "Table 1: Baseline characteristics at PRE and back squat training volume between clusters.", colwidths = 3) %>%
+  
+  add_footer_row(values = "Values are mean and (SD)", colwidths = 3) %>%
+  
+  autofit()
+  
+```
+
+## Part 2: Calculate measures of reliability
+### Technical error and smallest worthwhile change Vo2-maks
+```{r Calculation technical error Vo2maks, echo=FALSE, message=FALSE, warning=FALSE}
+dfvo2maks <- read_excel("./data/Plotteskjema_Vo2maks_laktatprofil_gruppe1.xlsx") %>%
+  select(timepoint, vo2.max, subject) %>%
+  pivot_wider(names_from = timepoint,
+              values_from = vo2.max) 
+  
+dfvo2maks %>%
+  mutate(change = t2 - t1) %>%
+  group_by() %>%
+  summarise(sd.change = sd(change), 
+            mean.test = mean(c(t1, t2)), 
+            te.abs = (sd.change / sqrt(2)), 
+            te.relative = (te.abs / mean.test) * 100) %>%
+  
+  
+  flextable()%>%
+  set_header_labels(sd.change = "SD change",
+                    mean.test = "Mean", 
+                    te.abs = "Technical error absolute",
+                    te.relative = "Technical error relative") %>%
+  add_header_row(values = "Technical error: Vo2maks", colwidths = 4) %>%
+  autofit()
+
+```
+
+```{r Calculation smallest worthwhile change Vo2maks, echo=FALSE, message=FALSE, warning=FALSE}
+
+dfvo2maks %>%
+  rowwise() %>%
+  mutate(m = mean(c(t1, t2))) %>%
+  ungroup() %>%
+  summarise(sd = sd(m), 
+            swc = 0.2 * sd) %>%
+  
+  flextable()%>%
+  set_header_labels(sd = "Standard deviation",
+                    swc = "Smallest worthwhile change") %>%
+  add_header_row(values = "Smallest worthwhile change: Vo2maks", colwidths = 2) %>%
+  autofit()
+
+```
+
+### Technical error and smallest worthwhile change power @ 4mmol
+```{r Calculation technical error power @ 4mmol, echo=FALSE, message=FALSE, warning=FALSE}
+
+dfw4mmol <- read_excel("./data/Plotteskjema_Vo2maks_laktatprofil_gruppe1.xlsx") %>%
+  select(timepoint, w.4mmol , subject) %>%
+  pivot_wider(names_from = timepoint,
+              values_from = w.4mmol) 
+  
+dfw4mmol %>%
+  mutate(change = t2 - t1) %>%
+  group_by() %>%
+  summarise(sd.change = sd(change), 
+            mean.test = mean(c(t1, t2)), 
+            te.abs = (sd.change / sqrt(2)), 
+            te.relative = (te.abs / mean.test) * 100) %>%
+  
+  
+  flextable()%>%
+  set_header_labels(sd.change = "SD change",
+                    mean.test = "Mean", 
+                    te.abs = "Technical error absolute",
+                    te.relative = "Technical error relative") %>%
+  add_header_row(values = "Technical error: Power @ 4mmol", colwidths = 4) %>%
+  autofit()
+
+```
+
+```{r Calculation smallest worthwhile change power @ 4mmol, echo=FALSE, message=FALSE, warning=FALSE}
+
+dfw4mmol %>%
+  rowwise() %>%
+  mutate(m = mean(c(t1, t2))) %>%
+  ungroup() %>%
+  summarise(sd = sd(m), 
+            swc = 0.2 * sd) %>%
+  
+  flextable()%>%
+  set_header_labels(sd = "Standard deviation",
+                    swc = "Smallest worthwhile change") %>%
+  add_header_row(values = "Smallest worthwhile change: Power @ 4mmol", colwidths = 2) %>%
+  autofit()
+
+```
+

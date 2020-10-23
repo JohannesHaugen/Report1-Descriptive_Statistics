@@ -1,0 +1,97 @@
+---
+title: "Descriptive Statistics"
+author: "Johannes Urdahl Haugen"
+date: "10/5/2020"
+output:
+  html_document: default
+  word_document: default
+---
+
+```{r Libraries, include=FALSE}
+library(readxl)
+library(readr)
+library(knitr)
+library(kableExtra)
+library(tidyverse)
+library(flextable)
+```
+
+```{r Oppsummeringstabell, include=FALSE}
+hypertrophy <- read_csv("DataHypertrophy.CSV")
+
+summary_table <- hypertrophy %>% 
+  dplyr::select(SUB_ID, GROUP,CLUSTER, AGE, T1_BODY_MASS, 
+                PERCENT_TYPE_II_T1, Squat_3RM_kg, DXA_LBM_1,
+                DXA_FM_T1, SQUAT_VOLUME) %>%
+  pivot_longer(cols = AGE:SQUAT_VOLUME, names_to = "variable", values_to = "values") %>%
+  filter(!is.na(CLUSTER)) %>%
+  
+  group_by(CLUSTER, variable) %>%
+  summarise(m = mean(values), 
+            s = sd(values)) %>%
+  mutate(m.s = paste0(round(m,1), " (", round(s,1), ")"),
+         CLUSTER = factor(CLUSTER, levels = c("LOW", "HIGH"), 
+                          labels = c("LOW (n = 10)", 
+                                     "HIGH (n = 10)"))) %>%
+  select(CLUSTER, variable, m.s) %>%
+  
+  pivot_wider(names_from = CLUSTER, values_from = m.s) %>%
+  
+  print()
+```
+
+```{r Table 1, echo=FALSE}
+
+summary_table %>% 
+  mutate(variable = factor(variable, levels = c("AGE", 
+                                      "T1_BODY_MASS", 
+                                      "DXA_LBM_1", 
+                                      "DXA_FM_T1", 
+                                      "PERCENT_TYPE_II_T1", 
+                                      "Squat_3RM_kg", 
+                                      "SQUAT_VOLUME"),
+                           labels = c("Age (yrs)",
+                                      "DXA FM (kg)",
+                                      "DXA LST (kg)",
+                                      "Type II fiber (%)",
+                                      "3RM back squat (kg)",
+                                      "Total back squat training volume (kg) 
+                                      from weeks 1 to 6","Body mass (kg)"))) %>%
+  
+  flextable() %>%
+  set_header_labels(variable = "Variable",
+                    HIGH = "HIGH (n=10)", 
+                    LOW = "LOW (n=10)") %>%
+  
+  add_header_row(values = "Table 1", colwidths = 3) %>%
+  
+  add_footer_row(values = "Values are mean and (SD)", colwidths = 3) %>%
+  
+  autofit()
+```
+
+```{r Utregning av Technical Error W@4mmol, echo=FALSE}
+dfw4mmol <- data.frame(t1w4mmol = c(148.8, 230.3, 155.9),
+                 t2w4mmol = c(135.1, 235.6, 236.9))
+
+dfw4mmol %>%
+  mutate(change = t2w4mmol - t1w4mmol) %>%
+  group_by() %>%
+  summarise(sd.change = sd(change), 
+            mean.test = mean(c(t1w4mmol, t2w4mmol)), 
+            te.abs = (sd.change / sqrt(2)), 
+            te.relative = (te.abs / mean.test) * 100) %>%
+  print()
+```
+
+```{r Utregning av Smallest worthwhile change W@4mmol, echo=FALSE}
+dfw4mmol %>%
+  rowwise() %>%
+  mutate(m = mean(c(t1w4mmol, t2w4mmol))) %>%
+  ungroup() %>%
+  summarise(sd = sd(m), 
+            swc = 0.2 * sd) %>%
+  print()
+```
+
+
